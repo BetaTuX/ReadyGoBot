@@ -51,14 +51,19 @@ var (
 	commands = []*myCommands.RGCommand{
 		&myCommands.AddTrackCommand,
 		&myCommands.ListTracksCommand,
+		&myCommands.AddHotlapCommand,
 	}
-	commandHandlers = make(map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate), len(commands))
+	commandHandlers   = make(map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate), len(commands))
+	componentHandlers = make(map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate), len(commands))
 )
 
 func bindCommand(cmd *myCommands.RGCommand) {
 	cmd.Command.Name = commandPrefix + cmd.Command.Name
 
 	commandHandlers[cmd.Command.Name] = cmd.Handler
+	for componentId, componentHandler := range cmd.ComponentHandlers {
+		componentHandlers[componentId] = componentHandler
+	}
 }
 
 func init() {
@@ -67,8 +72,15 @@ func init() {
 	}
 
 	s.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
-			h(s, i)
+		switch i.Type {
+		case discordgo.InteractionApplicationCommand:
+			if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
+				h(s, i)
+			}
+		case discordgo.InteractionMessageComponent:
+			if h, ok := componentHandlers[i.MessageComponentData().CustomID]; ok {
+				h(s, i)
+			}
 		}
 	})
 }

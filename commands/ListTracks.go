@@ -2,8 +2,10 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
 	"ReadyGoBot/store"
+	"ReadyGoBot/utils"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -18,22 +20,23 @@ var ListTracksCommand = RGCommand{
 		Type: discordgo.ChatApplicationCommand,
 	},
 	Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		fmtString := LocalizedString{
-			fallback: "List of available tracks:",
-			localized: map[discordgo.Locale]string{
+		fmtString := utils.LocalizedString{
+			Fallback: "List of available tracks:",
+			Localized: map[discordgo.Locale]string{
 				discordgo.French: "Les tracés disponibles sont les suivants :",
 			},
 		}
-		trackListFmted := ""
+		tracks := store.TrackStore.GetTracks()
+		trackNameList := make([]string, 0, len(tracks))
 
-		for _, track := range store.TrackStore.GetTracks() {
-			trackListFmted = fmt.Sprintf("%s\n- %s", trackListFmted, track.Name)
+		for _, track := range tracks {
+			trackNameList = append(trackNameList, track.Name)
 		}
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("%s\n%s", fmtString.getLocaleString(i.Locale), trackListFmted),
+				Content: fmt.Sprintf("%s\n%s", fmtString.GetLocaleString(i.Locale), strings.Join(trackNameList, "\n")),
 			},
 		})
 	},

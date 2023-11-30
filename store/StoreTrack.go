@@ -2,12 +2,14 @@ package store
 
 import (
 	"sync"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 type Track struct {
 	Id      string
 	Name    string
-	Picture any
+	Picture discordgo.MessageAttachment
 }
 
 type trackStore struct {

@@ -2,6 +2,8 @@ package commands
 
 import (
 	"ReadyGoBot/store"
+	"ReadyGoBot/utils"
+	"log"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/iancoleman/strcase"
@@ -60,11 +62,21 @@ var AddTrackCommand = RGCommand{
 		},
 	},
 	Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		var fmtString LocalizedString
-		options := i.ApplicationCommandData().Options
-		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
-		for _, opt := range options {
-			optionMap[opt.Name] = opt
+		var fmtString utils.LocalizedString
+		data := i.ApplicationCommandData()
+		optionMap := MapOptions(data.Options)
+		pictureId := optionMap[pictureField].Value
+		embeds := make([]*discordgo.MessageEmbed, 0)
+		var picture *discordgo.MessageAttachment
+
+		if pictureId != nil {
+			picture = data.Resolved.Attachments[pictureId.(string)]
+			embeds = append(embeds, &discordgo.MessageEmbed{
+				Type: discordgo.EmbedTypeImage,
+				Image: &discordgo.MessageEmbedImage{
+					URL: picture.URL,
+				},
+			})
 		}
 
 		var id string
@@ -77,30 +89,33 @@ var AddTrackCommand = RGCommand{
 		trackUpdated := store.TrackStore.SetTrack(store.Track{
 			Id:      id,
 			Name:    optionMap[labelField].StringValue(),
-			Picture: optionMap[pictureField].Value,
+			Picture: *picture,
 		})
 
 		if trackUpdated {
-			fmtString = LocalizedString{
-				fallback: "You *updated* the track successfully! :tada:",
-				localized: map[discordgo.Locale]string{
+			fmtString = utils.LocalizedString{
+				Fallback: "You *updated* the track successfully! :tada:",
+				Localized: map[discordgo.Locale]string{
 					discordgo.French: "Vous avez *mis à jour* le tracé avec succès ! :tada:",
 				},
 			}
 		} else {
-			fmtString = LocalizedString{
-				fallback: "You *added* the track successfully! :tada:",
-				localized: map[discordgo.Locale]string{
+			fmtString = utils.LocalizedString{
+				Fallback: "You *added* the track successfully! :tada:",
+				Localized: map[discordgo.Locale]string{
 					discordgo.French: "Vous avez *ajouté* le tracé avec succès ! :tada:",
 				},
 			}
 		}
 
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		if respErr := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: fmtString.getLocaleString(i.Locale),
+				Content: fmtString.GetLocaleString(i.Locale),
+				Embeds:  embeds,
 			},
-		})
+		}); respErr != nil {
+			log.Println("AddTrack: trace:\n", respErr)
+		}
 	},
 }
