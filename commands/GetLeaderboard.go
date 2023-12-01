@@ -1,8 +1,5 @@
 package commands
 
-// TODO: Fix table display
-// TODO: Delete original message once select reply posted (defer func)
-
 import (
 	"ReadyGoBot/commands/guards"
 	"ReadyGoBot/store"
