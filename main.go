@@ -52,6 +52,7 @@ var (
 		&myCommands.AddTrackCommand,
 		&myCommands.ListTracksCommand,
 		&myCommands.AddHotlapCommand,
+		&myCommands.GetLeaderboardCommand,
 	}
 	commandHandlers   = make(map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate), len(commands))
 	componentHandlers = make(map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate), len(commands))

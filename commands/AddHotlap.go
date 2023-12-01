@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"ReadyGoBot/commands/guards"
 	"ReadyGoBot/store"
 	"ReadyGoBot/utils"
 	"fmt"
@@ -19,7 +20,7 @@ type HotlapRegistration struct {
 }
 
 const (
-	trackSelectComponentId = "track_select"
+	addTrackSelectComponentId = "addhotlap_track_select"
 
 	timeOptionId = "time"
 )
@@ -52,24 +53,9 @@ func parseTimeParam(userInput string) (time.Duration, error) {
 	return laptime, parseError
 }
 
-func getTrackOptions(defaultValue string) []discordgo.SelectMenuOption {
-	tracks := store.TrackStore.GetTracks()
-	trackOptions := make([]discordgo.SelectMenuOption, 0, len(tracks))
-
-	for _, track := range tracks {
-		trackOptions = append(trackOptions, discordgo.SelectMenuOption{
-			Label:   track.Name,
-			Value:   track.Id,
-			Default: defaultValue == track.Id,
-		})
-	}
-
-	return trackOptions
-}
-
 var AddHotlapCommand = RGCommand{
 	Command: discordgo.ApplicationCommand{
-		Name:        "addhotlap",
+		Name:        "hotlapadd",
 		Description: "Share your lastest hotlap",
 		DescriptionLocalizations: &map[discordgo.Locale]string{
 			discordgo.French: "Partagez votre dernier meilleur temps",
@@ -105,51 +91,34 @@ var AddHotlapCommand = RGCommand{
 					discordgo.French: "Meilleur temps : `%s`\n\nTracé :",
 				},
 			}
-			trackOptions := getTrackOptions("")
 
-			if len(trackOptions) <= 0 {
-				noTrackStr := utils.LocalizedString{
-					Fallback: "Sadly no tracks have been set up yet. Please add tracks with the `addtrack` slash command.",
-					Localized: map[discordgo.Locale]string{
-						discordgo.French: "Malheureusement aucun tracé n'est disponible. Ajoutez-en via la commande `addtrack` puis réessayez.",
-					},
-				}
-
-				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			if trackOptions, trackListError := guards.TrackListIsPopulated(s, i); trackListError == nil {
+				if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
-						Content: noTrackStr.GetLocaleString(i.Locale),
+						Content: fmt.Sprintf(localizedFmtString.GetLocaleString(i.Locale), laptime.String()),
 						Flags:   discordgo.MessageFlagsEphemeral,
-					},
-				})
-				return
-			}
-
-			if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: fmt.Sprintf(localizedFmtString.GetLocaleString(i.Locale), laptime.String()),
-					Flags:   discordgo.MessageFlagsEphemeral,
-					Components: []discordgo.MessageComponent{
-						discordgo.ActionsRow{
-							Components: []discordgo.MessageComponent{
-								discordgo.SelectMenu{
-									CustomID:    trackSelectComponentId,
-									Placeholder: trackSelectPlaceholder.GetLocaleString(i.Locale),
-									Options:     trackOptions,
+						Components: []discordgo.MessageComponent{
+							discordgo.ActionsRow{
+								Components: []discordgo.MessageComponent{
+									discordgo.SelectMenu{
+										CustomID:    addTrackSelectComponentId,
+										Placeholder: trackSelectPlaceholder.GetLocaleString(i.Locale),
+										Options:     trackOptions,
+									},
 								},
 							},
 						},
 					},
-				},
-			}); err != nil {
-				fmt.Println("AddHotlap: trace:\n", err)
+				}); err != nil {
+					log.Println("AddHotlap: trace:\n", err)
+				}
 			}
 		}
 	},
 
 	ComponentHandlers: map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
-		trackSelectComponentId: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		addTrackSelectComponentId: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			driverUid := i.Member.User.ID
 			matchedRegistration, isRegistrated := ongoingRegisteration[driverUid]
 			if isRegistrated {
@@ -190,7 +159,7 @@ var AddHotlapCommand = RGCommand{
 							},
 						},
 					}); err != nil {
-						fmt.Println("AddHotlap: track_select: Couldn't post new success message\n", err)
+						log.Println("AddHotlap: track_select: Couldn't post new success message\n", err)
 					}
 				} else {
 					hottestLap, _ := store.HotlapStore.GetDriverHottestLap(driverUid, selectedTrackId)
@@ -211,7 +180,7 @@ var AddHotlapCommand = RGCommand{
 							Flags:   discordgo.MessageFlagsEphemeral,
 						},
 					}); err != nil {
-						fmt.Println("AddHotlap: track_select: Couldn't post new success message\n", err)
+						log.Println("AddHotlap: track_select: Couldn't post new success message\n", err)
 					}
 				}
 			}

@@ -3,6 +3,7 @@ package commands
 import (
 	"ReadyGoBot/store"
 	"ReadyGoBot/utils"
+	"fmt"
 	"log"
 
 	"github.com/bwmarrin/discordgo"
@@ -17,7 +18,7 @@ const (
 
 var AddTrackCommand = RGCommand{
 	Command: discordgo.ApplicationCommand{
-		Name:        "addtrack",
+		Name:        "trackadd",
 		Description: "Add a track to the leaderboard",
 		DescriptionLocalizations: &map[discordgo.Locale]string{
 			discordgo.French: "Ajouter une piste à tableau des scores",
@@ -66,6 +67,7 @@ var AddTrackCommand = RGCommand{
 		data := i.ApplicationCommandData()
 		optionMap := MapOptions(data.Options)
 		pictureId := optionMap[pictureField].Value
+		trackName := optionMap[labelField].StringValue()
 		embeds := make([]*discordgo.MessageEmbed, 0)
 		var picture *discordgo.MessageAttachment
 
@@ -81,29 +83,29 @@ var AddTrackCommand = RGCommand{
 
 		var id string
 		if optionMap[idField] == nil {
-			id = strcase.ToSnake(optionMap[labelField].StringValue())
+			id = strcase.ToSnake(trackName)
 		} else {
 			id = optionMap[idField].StringValue()
 		}
 
 		trackUpdated := store.TrackStore.SetTrack(store.Track{
 			Id:      id,
-			Name:    optionMap[labelField].StringValue(),
+			Name:    trackName,
 			Picture: *picture,
 		})
 
 		if trackUpdated {
 			fmtString = utils.LocalizedString{
-				Fallback: "You *updated* the track successfully! :tada:",
+				Fallback: "%s has been updated! :new:",
 				Localized: map[discordgo.Locale]string{
-					discordgo.French: "Vous avez *mis à jour* le tracé avec succès ! :tada:",
+					discordgo.French: "%s a été mis à jour ! :new:",
 				},
 			}
 		} else {
 			fmtString = utils.LocalizedString{
-				Fallback: "You *added* the track successfully! :tada:",
+				Fallback: "New track available! :tada:\n# %s",
 				Localized: map[discordgo.Locale]string{
-					discordgo.French: "Vous avez *ajouté* le tracé avec succès ! :tada:",
+					discordgo.French: "Nouveau circuit disponible ! :tada:\n# %s",
 				},
 			}
 		}
@@ -111,7 +113,7 @@ var AddTrackCommand = RGCommand{
 		if respErr := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: fmtString.GetLocaleString(i.Locale),
+				Content: fmt.Sprintf(fmtString.GetLocaleString(i.Locale), trackName),
 				Embeds:  embeds,
 			},
 		}); respErr != nil {

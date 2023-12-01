@@ -80,12 +80,15 @@ func (laps ByTime) Len() int           { return len(laps) }
 func (laps ByTime) Swap(i, j int)      { laps[i], laps[j] = laps[j], laps[i] }
 func (laps ByTime) Less(i, j int) bool { return laps[i].UpdatedAt.Before(laps[j].UpdatedAt) }
 
-func (store *hotlapStore) GetTrackHotlapList(trackId string) []Hotlap {
+func (store *hotlapStore) GetTrackHotlapList(trackId string, limit int) []Hotlap {
 	store.listMutex.Lock()
 	defer store.listMutex.Unlock()
-	lapList := make([]Hotlap, 0)
+	lapList := make([]Hotlap, 0, limit)
 
-	for _, hotlap := range store.list {
+	for idx, hotlap := range store.list {
+		if limit > 0 && idx > limit {
+			break
+		}
 		if hotlap.TrackId == trackId {
 			lapList = append(lapList, hotlap)
 		}
