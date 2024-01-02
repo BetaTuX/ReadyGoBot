@@ -2,18 +2,19 @@ package store
 
 import (
 	"fmt"
-	"sort"
+	"log"
 	"sync"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type Hotlap struct {
-	Id int64
+	gorm.Model
 	/** User's Discord id */
 	DriverUid string
 	TrackId   string
 	Time      time.Duration
-	UpdatedAt time.Time
 }
 
 type hotlapStore struct {
@@ -25,21 +26,19 @@ var HotlapStore = hotlapStore{
 	list: make([]Hotlap, 0),
 }
 
-func generateId() int64 {
-	if len(HotlapStore.list) > 0 {
-		return HotlapStore.list[len(HotlapStore.list)-1].Id + 1
-	}
-	return 1
-}
-
 /*
 Returns bool true if a new hotlap as been saved (added or updated), false if driver didn't beat his hotlap
 */
-func (store *hotlapStore) SetHotlap(trackId, driverUid string, pTime time.Duration) bool {
+func (store *hotlapStore) SetHotlap(trackId, driverUid string, pTime time.Duration) (bool, error) {
 	var hotlap Hotlap
 
-	store.listMutex.Lock()
-	defer store.listMutex.Unlock()
+	if err := DB.Find(&hotlap, Hotlap{
+		DriverUid: driverUid,
+		TrackId:   trackId,
+	}).Error; err != nil {
+		log.Printf("WARN: Finding track resulted in error: %v\n", err)
+		return false, fmt.Errorf("finding track resulted in error: %v", err)
+	}
 	for _, v := range store.list {
 		timeExists := v.DriverUid == driverUid && v.TrackId == trackId
 
@@ -48,24 +47,25 @@ func (store *hotlapStore) SetHotlap(trackId, driverUid string, pTime time.Durati
 		}
 		if v.Time > pTime {
 			hotlap.Time = pTime
-			hotlap.UpdatedAt = time.Now()
 		} else {
 			// Didn't beat his previous time
-			return false
+			return false, nil
 		}
 	}
 	if (hotlap == Hotlap{}) {
 		hotlap = Hotlap{
-			Id:        generateId(),
 			TrackId:   trackId,
 			DriverUid: driverUid,
 			Time:      pTime,
-			UpdatedAt: time.Now(),
 		}
+		DB.Create(&hotlap)
 		store.list = append(store.list, hotlap)
+	} else {
+		hotlap.Time = pTime
+		DB.Save(&hotlap)
 	}
 	fmt.Println("debug: StoreTime: added new time:", TrackStore.GetTrack(trackId).Name, driverUid, pTime.String())
-	return true
+	return true, nil
 }
 
 type ByDuration []Hotlap
@@ -81,44 +81,38 @@ func (laps ByTime) Swap(i, j int)      { laps[i], laps[j] = laps[j], laps[i] }
 func (laps ByTime) Less(i, j int) bool { return laps[i].UpdatedAt.Before(laps[j].UpdatedAt) }
 
 func (store *hotlapStore) GetTrackHotlapList(trackId string, limit int) []Hotlap {
-	store.listMutex.Lock()
-	defer store.listMutex.Unlock()
-	lapList := make([]Hotlap, 0, limit)
+	queryResult := make([]Hotlap, 0, limit)
 
-	for idx, hotlap := range store.list {
-		if limit > 0 && idx > limit {
-			break
-		}
-		if hotlap.TrackId == trackId {
-			lapList = append(lapList, hotlap)
-		}
+	res := DB.Order("Time ASC").Limit(limit).Find(&queryResult, Hotlap{TrackId: trackId})
+
+	if res.Error != nil {
+		log.Printf("Error on DB Find:\n%v\n", res.Error)
 	}
-	sort.Sort(ByDuration(lapList))
-	return lapList
+	return queryResult
 }
 
 func (store *hotlapStore) GetDriverHotlapList(pDriverUid string) []Hotlap {
-	store.listMutex.Lock()
-	defer store.listMutex.Unlock()
-	lapList := make([]Hotlap, 0)
+	queryResult := make([]Hotlap, 0)
 
-	for _, hotlap := range store.list {
-		if hotlap.DriverUid == pDriverUid {
-			lapList = append(lapList, hotlap)
-		}
+	res := DB.Order("UpdatedAt ASC").Find(&queryResult, Hotlap{DriverUid: pDriverUid})
+
+	if res.Error != nil {
+		log.Printf("Error on DB Find:\n%v\n", res.Error)
 	}
-	sort.Sort(ByTime(lapList))
-	return lapList
+	return queryResult
 }
 
 func (store *hotlapStore) GetDriverHottestLap(pDriverUid, pTrackId string) (Hotlap, error) {
-	store.listMutex.Lock()
-	defer store.listMutex.Unlock()
+	queryResult := make([]Hotlap, 0)
 
-	for _, v := range store.list {
-		if v.DriverUid == pDriverUid && v.TrackId == pTrackId {
-			return v, nil
-		}
+	res := DB.Order("Time ASC").Find(&queryResult, Hotlap{TrackId: pTrackId, DriverUid: pDriverUid})
+
+	if res.Error != nil {
+		log.Printf("Error on DB Find:\n%v\n", res.Error)
 	}
-	return Hotlap{}, fmt.Errorf("No hotlap set on track (%s) for driver (%s)", pTrackId, pDriverUid)
+
+	if len(queryResult) <= 0 {
+		return Hotlap{}, fmt.Errorf("No hotlap set on track (%s) for driver (%s)", pTrackId, pDriverUid)
+	}
+	return queryResult[0], nil
 }

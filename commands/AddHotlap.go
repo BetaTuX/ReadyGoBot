@@ -124,7 +124,7 @@ var AddHotlapCommand = RGCommand{
 			if isRegistrated {
 				selectedTrackId := strings.Join(i.MessageComponentData().Values, ";")
 				selectedTrack := store.TrackStore.GetTrack(selectedTrackId)
-				timeImproved := store.HotlapStore.SetHotlap(selectedTrackId, driverUid, matchedRegistration.laptime)
+				timeImproved, _ := store.HotlapStore.SetHotlap(selectedTrackId, driverUid, matchedRegistration.laptime)
 				defer func() {
 					// Delete original message once the announcement has been made
 					delete(ongoingRegisteration, driverUid)

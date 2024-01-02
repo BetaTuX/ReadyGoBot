@@ -89,9 +89,9 @@ var AddTrackCommand = RGCommand{
 		}
 
 		trackUpdated := store.TrackStore.SetTrack(store.Track{
-			Id:      id,
+			TrackId: id,
 			Name:    trackName,
-			Picture: *picture,
+			Picture: store.PictureAttachment(*picture),
 		})
 
 		if trackUpdated {

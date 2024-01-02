@@ -15,8 +15,8 @@ func getTrackOptions(defaultValue string) []discordgo.SelectMenuOption {
 	for _, track := range tracks {
 		trackOptions = append(trackOptions, discordgo.SelectMenuOption{
 			Label:   track.Name,
-			Value:   track.Id,
-			Default: defaultValue == track.Id,
+			Value:   track.TrackId,
+			Default: defaultValue == track.TrackId,
 		})
 	}
 

@@ -8,6 +8,7 @@ import (
 	"os/signal"
 
 	myCommands "ReadyGoBot/commands"
+	"ReadyGoBot/store"
 
 	"github.com/bwmarrin/discordgo"
 	dotenv "github.com/joho/godotenv"
@@ -25,6 +26,7 @@ var s *discordgo.Session
 func init() {
 	dotenv.Load()
 	flag.Parse()
+	store.InitTables()
 }
 
 func init() {
